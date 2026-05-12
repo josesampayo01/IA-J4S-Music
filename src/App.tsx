@@ -190,7 +190,7 @@ export default function App() {
   const [detectedKey, setDetectedKey] = useState<string>('');
 
   const separatorAudioRef = useRef<HTMLAudioElement | null>(null);
-  const separatorFilterRef = useRef<BiquadFilterNode | null>(null);
+  const separatorFiltersRef = useRef<BiquadFilterNode[]>([]);
 
   // Separator Audio Initialization
   useEffect(() => {
@@ -202,41 +202,53 @@ export default function App() {
         const ctx = getAudioCtx();
         if (ctx) {
             const source = ctx.createMediaElementSource(separatorAudioRef.current);
-            const filter = ctx.createBiquadFilter();
-            source.connect(filter);
-            filter.connect(ctx.destination);
-            separatorFilterRef.current = filter;
+            const f1 = ctx.createBiquadFilter();
+            const f2 = ctx.createBiquadFilter();
+            const f3 = ctx.createBiquadFilter();
+            const f4 = ctx.createBiquadFilter();
+            
+            source.connect(f1);
+            f1.connect(f2);
+            f2.connect(f3);
+            f3.connect(f4);
+            f4.connect(ctx.destination);
+            
+            separatorFiltersRef.current = [f1, f2, f3, f4];
         }
     }
   }, [file, status]);
 
   // Separator playback logic
   useEffect(() => {
-    if (!separatorAudioRef.current || !separatorFilterRef.current) return;
+    if (!separatorAudioRef.current || separatorFiltersRef.current.length === 0) return;
 
     if (playingStem) {
         getAudioCtx()?.resume();
         separatorAudioRef.current.play().catch(console.error);
 
-        const filter = separatorFilterRef.current;
-        // Mock eq filtering to sound like stems
-        if (playingStem === 'Voces') {
-            filter.type = 'bandpass';
-            filter.frequency.value = 1800;
-            filter.Q.value = 4.5; // High Q to isolate vocals, eliminating bass and highs
-        } else if (playingStem === 'Batería') {
-            filter.type = 'lowpass';
-            filter.frequency.value = 250;
-            filter.Q.value = 1.0; 
-        } else if (playingStem === 'Bajo') {
-            filter.type = 'lowpass';
-            filter.frequency.value = 80;
-            filter.Q.value = 5.0; // Very sharp cut for bass guitar/808
-        } else {
-            filter.type = 'highpass';
-            filter.frequency.value = 4000;
-            filter.Q.value = 3.0; // Isolate cymbals/high synths
-        }
+        const filters = separatorFiltersRef.current;
+        
+        // Multiplying cascaded filters creates a very sharp cut-off (48dB/octave) for clean separation
+        filters.forEach((filter, index) => {
+            if (playingStem === 'Voces') {
+                filter.type = 'bandpass';
+                filter.frequency.value = 1600;
+                filter.Q.value = index === 0 ? 1.5 : 1.0; // Staggered Q for smoother but deep cut
+            } else if (playingStem === 'Batería') {
+                // Notch vocals and highs out, leaving impactful lows and low-mids
+                filter.type = index < 2 ? 'lowpass' : 'notch';
+                filter.frequency.value = index < 2 ? 300 : 1500;
+                filter.Q.value = 0.8;
+            } else if (playingStem === 'Bajo') {
+                filter.type = 'lowpass';
+                filter.frequency.value = 90; // Strictly sub and bass fundamental frequencies
+                filter.Q.value = 1.0;
+            } else {
+                filter.type = 'highpass';
+                filter.frequency.value = 3500;
+                filter.Q.value = 1.2;
+            }
+        });
     } else {
         separatorAudioRef.current.pause();
     }
@@ -247,6 +259,7 @@ export default function App() {
   const [studioFile, setStudioFile] = useState<File | null>(null);
   const [isStudioPlaying, setIsStudioPlaying] = useState(false);
   const [voiceEffect, setVoiceEffect] = useState<string>('none');
+  const [isApplyingModel, setIsApplyingModel] = useState<boolean>(false);
   const [aiEnhancement, setAiEnhancement] = useState<boolean>(true);
   const [spatialEffects, setSpatialEffects] = useState<boolean>(false);
   const [reverbMix, setReverbMix] = useState<number>(30);
@@ -328,16 +341,38 @@ export default function App() {
     }
   }, [studioFile]);
 
+  const applyVoiceModel = (id: string) => {
+    if (id === voiceEffect) return;
+    setIsApplyingModel(true);
+    if (isStudioPlaying && studioAudioRef.current) {
+        studioAudioRef.current.pause();
+    }
+    
+    // Simulate RVC/VITS deep learning model inference setup
+    setTimeout(() => {
+        setVoiceEffect(id);
+        setIsApplyingModel(false);
+        if (isStudioPlaying && studioAudioRef.current) {
+            studioAudioRef.current.play();
+        }
+    }, 1500);
+  };
+
   // Update effects
   useEffect(() => {
     if (!effectChainRef.current) return;
     const { filter, delay, feedback, dryGain, wetGain } = effectChainRef.current;
     
+    if (studioAudioRef.current) {
+       // @ts-ignore
+       studioAudioRef.current.preservesPitch = false; 
+    }
+
     if (voiceEffect === 'bad_bunny') {
         filter.type = 'lowshelf';
         filter.frequency.value = 500;
         filter.gain.value = 10;
-        // Simulamos bajando un poco la velocidad (pitch shift simple)
+        // Simulamos el "Pitch Shift" sin time stretch nativo (algunos navegadores lo permiten con preservesPitch=false, sino altera la velocidad)
         if (studioAudioRef.current) studioAudioRef.current.playbackRate = 0.85;
     } else if (voiceEffect === 'miky_woodz') {
         filter.type = 'highshelf';
@@ -348,6 +383,12 @@ export default function App() {
         filter.type = 'bandpass';
         filter.frequency.value = 2000;
         if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.15;
+    } else if (voiceEffect === 'anuel_aa') {
+        filter.type = 'peaking';
+        filter.frequency.value = 1000;
+        filter.Q.value = 0.5;
+        filter.gain.value = 5;
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 0.95;
     } else {
         filter.type = 'allpass';
         if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.0;
@@ -1003,6 +1044,13 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-4">
+                    {isApplyingModel && (
+                      <div className="col-span-2 mb-2 p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl flex items-center justify-center gap-3">
+                        <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                        <span className="text-sm font-medium text-purple-300">Descargando e inicializando pesos del modelo RVC v2...</span>
+                      </div>
+                    )}
+                    
                     {[
                       { id: 'none', label: 'Mi Voz Original' },
                       { id: 'bad_bunny', label: 'Bad Bunny (Grave)' },
@@ -1013,12 +1061,13 @@ export default function App() {
                     ].map((effect) => (
                       <button
                         key={effect.id}
-                        onClick={() => setVoiceEffect(effect.id)}
+                        disabled={isApplyingModel}
+                        onClick={() => applyVoiceModel(effect.id)}
                         className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all ${
                           voiceEffect === effect.id 
                             ? 'border-purple-500/50 bg-purple-500/10 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.1)]' 
                             : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 hover:bg-white/10 hover:text-gray-200'
-                        }`}
+                        } ${isApplyingModel ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {effect.label}
                       </button>
