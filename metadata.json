@@ -1,6 +1,6 @@
 {
-  "name": "Convertidor de Pistas",
-  "description": "Aplicación web para separar instrumentos de una pista de audio (Voces, Batería, Bajo, Otros) usando IA.",
-  "requestFramePermissions": [],
+  "name": "J4S Music Records AI",
+  "description": "Potente motor de IA y editor de audio para separar pistas, clonar voces y buscar recursos.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": []
 }

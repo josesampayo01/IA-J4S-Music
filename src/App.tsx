@@ -389,6 +389,17 @@ export default function App() {
         filter.Q.value = 0.5;
         filter.gain.value = 5;
         if (studioAudioRef.current) studioAudioRef.current.playbackRate = 0.95;
+    } else if (voiceEffect === 'jhay_co') {
+        filter.type = 'highshelf';
+        filter.frequency.value = 3500;
+        filter.gain.value = 6;
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.02;
+    } else if (voiceEffect === 'feid') {
+        filter.type = 'peaking';
+        filter.frequency.value = 2500;
+        filter.Q.value = 1.2;
+        filter.gain.value = 4;
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 0.98;
     } else {
         filter.type = 'allpass';
         if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.0;
@@ -477,8 +488,11 @@ export default function App() {
               mediaRecorderRef.current = new MediaRecorder(stream);
               mediaRecorderRef.current.ondataavailable = (e) => chunksRef.current.push(e.data);
               mediaRecorderRef.current.onstop = () => {
-                  const blob = new Blob(chunksRef.current, { type: 'audio/ogg; codecs=opus' });
-                  const newFile = new File([blob], 'grabacion_voz.ogg', { type: blob.type });
+                  const blobType = chunksRef.current[0]?.type || 'audio/webm';
+                  const blob = new Blob(chunksRef.current, { type: blobType });
+                  // Find accurate extension based on mime type
+                  const ext = blobType.includes('mp4') ? 'm4a' : blobType.includes('ogg') ? 'ogg' : 'webm';
+                  const newFile = new File([blob], `grabacion_voz_j4s.${ext}`, { type: blob.type });
                   setStudioFile(newFile);
                   setStudioStatus('done');
                   chunksRef.current = [];
@@ -487,7 +501,7 @@ export default function App() {
               setIsRecording(true);
           } catch (e) {
               console.error(e);
-              alert("No se pudo acceder al micrófono.");
+              alert("🤖 J4S Error: No se pudo acceder al micrófono. Verifica los permisos de tu navegador o dispositivo.");
           }
       }
   };
@@ -867,11 +881,17 @@ export default function App() {
                 className="border-2 border-dashed border-purple-500/20 rounded-3xl p-12 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center text-center hover:bg-black/60 hover:border-purple-500/50 transition-all shadow-2xl relative overflow-hidden group"
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-purple-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="w-20 h-20 bg-purple-500/10 text-purple-400 rounded-full flex items-center justify-center mb-6 transition-all hover:scale-110 hover:bg-purple-500/20 cursor-pointer shadow-[0_0_15px_rgba(168,85,247,0.1)]">
+                <div className={`w-20 h-20 ${isRecording ? 'bg-red-500/20 text-red-400' : 'bg-purple-500/10 text-purple-400'} rounded-full flex items-center justify-center mb-6 transition-all hover:scale-110 ${isRecording ? 'hover:bg-red-500/30' : 'hover:bg-purple-500/20'} cursor-pointer shadow-[0_0_15px_rgba(168,85,247,0.1)] relative`}>
+                  {isRecording && (
+                      <>
+                        <div className="absolute inset-0 border-2 border-red-500 rounded-full animate-ping opacity-75"></div>
+                        <div className="absolute -inset-4 border border-red-500/30 rounded-full animate-pulse opacity-50"></div>
+                      </>
+                  )}
                   <Mic className="w-10 h-10" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2 text-white">Canta o habla al micrófono</h3>
-                <p className="text-sm text-gray-500 mb-8">Permite usar el micrófono para grabar directamente o importar tu voz</p>
+                <h3 className="text-xl font-semibold mb-2 text-white">{isRecording ? 'Grabando Red Neural...' : 'Canta o habla al micrófono'}</h3>
+                <p className="text-sm text-gray-500 mb-8">{isRecording ? 'Procesando tu huella vocal para la clonación J4S' : 'Permite usar el micrófono para grabar directamente o importar tu voz'}</p>
                 
                 <div className="flex flex-col sm:flex-row gap-5">
                   <button 
@@ -1053,11 +1073,13 @@ export default function App() {
                     
                     {[
                       { id: 'none', label: 'Mi Voz Original' },
-                      { id: 'bad_bunny', label: 'Bad Bunny (Grave)' },
-                      { id: 'miky_woodz', label: 'Miky Woodz (Brillo)' },
-                      { id: 'nengo_flow', label: 'Ñengo (Agudo)' },
-                      { id: 'anuel_aa', label: 'Anuel AA' },
-                      { id: 'custom', label: 'Otro Artista...' },
+                      { id: 'bad_bunny', label: 'Model: Bad Bunny v4 (Epic)' },
+                      { id: 'miky_woodz', label: 'Model: Miky Woodz RVC' },
+                      { id: 'nengo_flow', label: 'Model: Ñengo (High Pitch)' },
+                      { id: 'anuel_aa', label: 'Model: Anuel AA v2' },
+                      { id: 'jhay_co', label: 'Model: Jhayco' },
+                      { id: 'feid', label: 'Model: Feid (Ferxxo)' },
+                      { id: 'custom', label: 'Buscar Online...' },
                     ].map((effect) => (
                       <button
                         key={effect.id}
