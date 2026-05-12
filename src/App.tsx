@@ -226,7 +226,8 @@ export default function App() {
     filter: BiquadFilterNode;
     delay: DelayNode;
     feedback: GainNode;
-    gain: GainNode;
+    dryGain: GainNode;
+    wetGain: GainNode;
   } | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
@@ -242,18 +243,23 @@ export default function App() {
             const filter = ctx.createBiquadFilter();
             const delay = ctx.createDelay();
             const feedback = ctx.createGain();
-            const gain = ctx.createGain();
+            const dryGain = ctx.createGain();
+            const wetGain = ctx.createGain();
             
             mediaSourceRef.current.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
             
+            // Ruta directa (Dry)
+            filter.connect(dryGain);
+            dryGain.connect(ctx.destination);
+            
+            // Ruta de efectos (Wet)
             filter.connect(delay);
             delay.connect(feedback);
             feedback.connect(delay);
-            delay.connect(gain);
+            delay.connect(wetGain);
+            wetGain.connect(ctx.destination);
             
-            effectChainRef.current = { filter, delay, feedback, gain };
+            effectChainRef.current = { filter, delay, feedback, dryGain, wetGain };
         }
     }
     if (studioFile && studioAudioRef.current) {
@@ -264,29 +270,37 @@ export default function App() {
   // Update effects
   useEffect(() => {
     if (!effectChainRef.current) return;
-    const { filter, delay, feedback, gain } = effectChainRef.current;
+    const { filter, delay, feedback, dryGain, wetGain } = effectChainRef.current;
     
     if (voiceEffect === 'bad_bunny') {
         filter.type = 'lowshelf';
         filter.frequency.value = 500;
         filter.gain.value = 10;
+        // Simulamos bajando un poco la velocidad (pitch shift simple)
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 0.85;
     } else if (voiceEffect === 'miky_woodz') {
-        filter.type = 'highpass';
+        filter.type = 'highshelf';
         filter.frequency.value = 1500;
+        filter.gain.value = 8;
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.05;
     } else if (voiceEffect === 'nengo_flow') {
         filter.type = 'bandpass';
-        filter.frequency.value = 1000;
+        filter.frequency.value = 2000;
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.15;
     } else {
         filter.type = 'allpass';
+        if (studioAudioRef.current) studioAudioRef.current.playbackRate = 1.0;
     }
     
     if (spatialEffects) {
         delay.delayTime.value = reverbDecay * 0.2;
         feedback.gain.value = Math.min((delayFeedback / 100) * 0.9, 0.9); 
-        gain.gain.value = 1 - (delayMix / 100 * 0.5);
+        wetGain.gain.value = delayMix / 100;
+        dryGain.gain.value = 1 - ((delayMix / 100) * 0.5);
     } else {
         feedback.gain.value = 0;
-        gain.gain.value = 1;
+        wetGain.gain.value = 0;
+        dryGain.gain.value = 1;
     }
     
   }, [voiceEffect, spatialEffects, delayFeedback, reverbMix, delayMix, reverbDecay]);
@@ -351,7 +365,13 @@ export default function App() {
           setIsRecording(false);
       } else {
           try {
-              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                  echoCancellation: true, 
+                  noiseSuppression: true, 
+                  autoGainControl: true,
+                } 
+              });
               mediaRecorderRef.current = new MediaRecorder(stream);
               mediaRecorderRef.current.ondataavailable = (e) => chunksRef.current.push(e.data);
               mediaRecorderRef.current.onstop = () => {
@@ -830,29 +850,36 @@ export default function App() {
 
                 {/* Panel Cambiador de Voz */}
                 <div className="bg-[#121217]/50 backdrop-blur-sm border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col">
-                  <div className="flex items-center gap-3 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-purple-500/10 text-purple-400 rounded-xl shadow-[0_0_10px_rgba(168,85,247,0.1)]">
                       <Wand2 className="w-5 h-5" />
                     </div>
                     <div>
                       <h3 className="font-bold text-white">Cover IA (Voces de Artistas)</h3>
-                      <p className="text-sm text-gray-400">Haz que tu voz suene como tus cantantes favoritos</p>
+                      <p className="text-sm text-gray-400">Efectos de emulación de artistas</p>
                     </div>
+                  </div>
+
+                  <div className="bg-purple-900/20 border border-purple-500/20 rounded-lg p-3 mb-5 flex gap-2 text-xs text-purple-200">
+                    <div className="mt-0.5"><Settings className="w-4 h-4" /></div>
+                    <p className="leading-tight">
+                      <strong>Nota de IA:</strong> Esta interfaz utiliza filtros de navegador (Tono, EQ). Replicar voces de forma perfecta (Zero-Shot) requiere implementar un servidor backend con GPU (ej. Python, RVC o ElevenLabs).
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     {[
                       { id: 'none', label: 'Mi Voz Original' },
-                      { id: 'bad_bunny', label: 'Bad Bunny' },
-                      { id: 'miky_woodz', label: 'Miky Woodz' },
-                      { id: 'nengo_flow', label: 'Ñengo Flow' },
+                      { id: 'bad_bunny', label: 'Bad Bunny (Grave)' },
+                      { id: 'miky_woodz', label: 'Miky Woodz (Brillo)' },
+                      { id: 'nengo_flow', label: 'Ñengo (Agudo)' },
                       { id: 'anuel_aa', label: 'Anuel AA' },
                       { id: 'custom', label: 'Otro Artista...' },
                     ].map((effect) => (
                       <button
                         key={effect.id}
                         onClick={() => setVoiceEffect(effect.id)}
-                        className={`px-3 py-2 text-sm font-medium rounded-xl border transition-all ${
+                        className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all ${
                           voiceEffect === effect.id 
                             ? 'border-purple-500/50 bg-purple-500/10 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.1)]' 
                             : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 hover:bg-white/10 hover:text-gray-200'
@@ -874,7 +901,7 @@ export default function App() {
                         <input 
                           type="text" 
                           placeholder="Buscar otro artista (ej. Drake, Rosalía)" 
-                          className="w-full text-sm px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                          className="w-full text-sm px-4 py-2 border border-white/10 bg-black/40 text-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder:text-gray-600"
                         />
                       </motion.div>
                     )}
