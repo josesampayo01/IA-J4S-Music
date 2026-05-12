@@ -18,6 +18,49 @@ const STEMS: Stem[] = [
   { name: 'Otros', icon: <Waves className="w-5 h-5" />, color: 'bg-blue-500' },
 ];
 
+const LiveWaveform = ({ isPlaying }: { isPlaying: boolean }) => {
+  const [bars, setBars] = React.useState<number[]>(Array.from({ length: 120 }, () => 10));
+
+  React.useEffect(() => {
+    if (!isPlaying) return;
+    
+    let animationFrameId: number;
+    let lastUpdate = Date.now();
+
+    const updateBars = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 50) {
+        setBars(prev => prev.map((_, i) => {
+          const baseHeight = Math.sin(i * 0.2 + now * 0.005) * 30 + 40;
+          const randomSpike = Math.random() * 30;
+          return Math.max(10, Math.min(100, baseHeight + randomSpike));
+        }));
+        lastUpdate = now;
+      }
+      animationFrameId = requestAnimationFrame(updateBars);
+    };
+
+    updateBars();
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isPlaying]);
+
+  return (
+    <div className="h-32 flex items-center gap-1 w-full opacity-80 overflow-hidden px-2 mb-6">
+      {bars.map((height, i) => (
+        <div 
+          key={i} 
+          className="w-1.5 bg-gradient-to-t from-purple-500 to-indigo-400 rounded-full transition-all duration-75"
+          style={{ 
+            height: `${isPlaying ? height : Math.max(10, Math.sin(i * 0.2) * 50 + 10)}%`,
+            opacity: i % 10 === 0 ? 0.5 : 1
+          }}
+        ></div>
+      ))}
+    </div>
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('separator');
   const [status, setStatus] = useState<ProcessStatus>('idle');
@@ -30,8 +73,14 @@ export default function App() {
   // Estudio State
   const [studioStatus, setStudioStatus] = useState<ProcessStatus>('idle');
   const [studioFile, setStudioFile] = useState<File | null>(null);
+  const [isStudioPlaying, setIsStudioPlaying] = useState(false);
   const [voiceEffect, setVoiceEffect] = useState<string>('none');
   const [aiEnhancement, setAiEnhancement] = useState<boolean>(true);
+  const [spatialEffects, setSpatialEffects] = useState<boolean>(false);
+  const [reverbMix, setReverbMix] = useState<number>(30);
+  const [reverbDecay, setReverbDecay] = useState<number>(1.5);
+  const [delayMix, setDelayMix] = useState<number>(20);
+  const [delayFeedback, setDelayFeedback] = useState<number>(40);
   const studioFileInputRef = useRef<HTMLInputElement>(null);
 
   // Producer State
@@ -132,38 +181,43 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-indigo-100 flex flex-col">
+    <div className="min-h-screen bg-[#09090b] text-gray-100 font-sans selection:bg-indigo-500/30 flex flex-col relative overflow-hidden">
+      {/* Background FX */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none z-0"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none z-0"></div>
+      <div className="absolute inset-0 bg-[url('https://i.imgur.com/3q174vj.png')] bg-repeat opacity-[0.03] z-0 pointer-events-none"></div>
+
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 py-4">
+      <header className="bg-[#0f0f13]/80 backdrop-blur-md border-b border-white/5 py-4 relative z-10 shadow-xl">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-lg text-white">
+            <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg text-white shadow-lg shadow-indigo-500/20">
               <AudioWaveform className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-gray-900">AudioStudio AI</h1>
-              <p className="text-sm text-gray-500">Herramientas profesionales de audio</p>
+              <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-sm">AudioStudio AI</h1>
+              <p className="text-sm text-gray-400">Herramientas profesionales de audio</p>
             </div>
           </div>
           
-          <div className="flex flex-wrap bg-gray-100 p-1 rounded-xl">
+          <div className="flex flex-wrap bg-white/5 p-1.5 rounded-xl border border-white/5">
             <button 
               onClick={() => setActiveTab('separator')}
-              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'separator' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'separator' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
             >
               <Music className="w-4 h-4" />
               Separador
             </button>
             <button 
               onClick={() => setActiveTab('studio')}
-              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'studio' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'studio' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
             >
               <Mic className="w-4 h-4" />
               Estudio de Voz
             </button>
             <button 
               onClick={() => setActiveTab('producer')}
-              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'producer' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'producer' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
             >
               <Piano className="w-4 h-4" />
               Productor IA / Beatmaker
@@ -173,7 +227,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col relative z-10">
         <AnimatePresence mode="wait">
           {activeTab === 'separator' && status === 'idle' && (
             <motion.div
@@ -184,21 +238,21 @@ export default function App() {
               className="w-full max-w-2xl mx-auto my-auto"
             >
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold tracking-tight mb-3">Extrae voces e instrumentos</h2>
-                <p className="text-gray-600">Sube cualquier canción y nuestra IA separará las pistas en Voces, Batería, Bajo y Otros instrumentos en segundos.</p>
+                <h2 className="text-4xl font-bold tracking-tight mb-3 text-white drop-shadow-md">Extrae voces e instrumentos</h2>
+                <p className="text-gray-400 text-lg">Sube cualquier canción y nuestra IA separará las pistas en Voces, Batería, Bajo y Otros instrumentos en segundos.</p>
               </div>
 
               <div 
-                className="border-2 border-dashed border-gray-300 rounded-2xl p-12 bg-white flex flex-col items-center justify-center text-center hover:bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer group shadow-sm"
+                className="border-2 border-dashed border-white/10 rounded-3xl p-12 bg-[#121217]/50 backdrop-blur-sm flex flex-col items-center justify-center text-center hover:bg-[#1a1a24]/50 hover:border-indigo-500/50 transition-all cursor-pointer group shadow-2xl"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Upload className="w-8 h-8" />
+                <div className="w-20 h-20 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                  <Upload className="w-10 h-10" />
                 </div>
-                <h3 className="text-lg font-semibold mb-1">Selecciona o arrastra tu audio</h3>
-                <p className="text-sm text-gray-500 mb-6">Soporta MP3, WAV, FLAC, M4A (Max 15MB)</p>
-                <button className="bg-indigo-600 text-white px-6 py-2.5 rounded-full font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
-                  <FileAudio className="w-4 h-4" />
+                <h3 className="text-xl font-semibold mb-2 text-white">Selecciona o arrastra tu audio</h3>
+                <p className="text-sm text-gray-500 mb-8">Soporta MP3, WAV, FLAC, M4A (Max 15MB)</p>
+                <button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-3 rounded-full font-medium hover:from-indigo-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/20">
+                  <FileAudio className="w-5 h-5" />
                   Elegir Archivo
                 </button>
                 <input 
@@ -218,29 +272,29 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
-              className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-center"
+              className="w-full max-w-md bg-[#121217]/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white/10 text-center mx-auto"
             >
               <div className="relative w-24 h-24 mx-auto mb-6">
-                <svg className="w-full h-full text-gray-200" viewBox="0 0 100 100">
+                <svg className="w-full h-full text-gray-800" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" />
                 </svg>
-                <svg className="w-full h-full text-indigo-600 absolute top-0 left-0 -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray={`${progress * 2.83} 283`} className="transition-all duration-300 ease-out" />
+                <svg className="w-full h-full text-indigo-500 absolute top-0 left-0 -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray={`${progress * 2.83} 283`} className="transition-all duration-300 ease-out drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-indigo-600">
+                <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-indigo-400">
                   {progress}%
                 </div>
               </div>
-              <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2">
+              <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2 text-white">
                 {status === 'uploading' ? (
                   <>Subiendo archivo...</>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5 text-indigo-500" /> Separando pistas con IA...
+                    <Sparkles className="w-5 h-5 text-indigo-400" /> Separando pistas con IA...
                   </>
                 )}
               </h3>
-              <p className="text-gray-500 text-sm">{file?.name}</p>
+              <p className="text-gray-400 text-sm">{file?.name}</p>
             </motion.div>
           )}
 
@@ -251,20 +305,20 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               className="w-full max-w-3xl"
             >
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-8 text-white">
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight mb-1">¡Separación Completada!</h2>
-                  <p className="text-gray-500 text-sm">Mostrando resultados para <span className="font-semibold text-gray-700">{file?.name}</span></p>
+                  <h2 className="text-3xl font-bold tracking-tight mb-1 text-white">¡Separación Completada!</h2>
+                  <p className="text-gray-400 text-sm">Mostrando resultados para <span className="font-semibold text-gray-200">{file?.name}</span></p>
                 </div>
                 <button 
                   onClick={reset}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors text-gray-700"
+                  className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 transition-all text-gray-200"
                 >
                   Procesar nueva pista
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {STEMS.map((stem, idx) => {
                   const isPlaying = playingStem === stem.name;
                   return (
@@ -273,28 +327,28 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1 }}
                     key={stem.name} 
-                    className={`bg-white border p-5 rounded-xl shadow-sm flex items-center justify-between group transition-colors ${isPlaying ? 'border-indigo-300 ring-1 ring-indigo-300' : 'border-gray-200'}`}
+                    className={`bg-[#121217]/60 backdrop-blur-sm border p-6 rounded-2xl flex items-center justify-between group transition-all shadow-lg ${isPlaying ? 'border-indigo-500/50 shadow-indigo-500/10' : 'border-white/5'}`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-lg text-white ${stem.color}`}>
+                      <div className={`p-4 rounded-xl text-white shadow-lg ${stem.color}`}>
                         {stem.icon}
                       </div>
                       <div>
-                        <h4 className="font-semibold text-gray-900">{stem.name}</h4>
-                        <p className="text-xs text-gray-500">Separado por IA</p>
+                        <h4 className="font-bold text-lg text-white tracking-tight">{stem.name}</h4>
+                        <p className="text-xs text-gray-400 font-medium">Separado por IA (Demucs v4)</p>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <button 
                         onClick={() => setPlayingStem(isPlaying ? null : stem.name)}
-                        className={`p-2 rounded-full transition-colors flex items-center justify-center ${isPlaying ? 'text-indigo-600 bg-indigo-100 ring-2 ring-indigo-200' : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                        className={`p-3 rounded-full transition-all flex items-center justify-center ${isPlaying ? 'text-white bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
                         title={isPlaying ? "Pausar" : "Reproducir"}
                       >
                         {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
                       </button>
                       <button 
-                        className="p-2 text-gray-400 hover:text-indigo-600 flex items-center gap-1 hover:bg-indigo-50 rounded-full transition-colors"
+                        className="p-3 text-gray-400 hover:text-white flex items-center gap-1 hover:bg-white/10 rounded-full transition-colors"
                         title={`Descargar como ${exportFormat}`}
                       >
                         <Download className="w-5 h-5" />
@@ -304,28 +358,28 @@ export default function App() {
                 )})}
               </div>
 
-              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50 border border-gray-100 p-4 rounded-xl">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <label htmlFor="format" className="text-sm font-medium text-gray-700">Formato:</label>
+              <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-[#121217]/50 border border-white/5 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                  <label htmlFor="format" className="text-sm font-semibold text-gray-300">Formato HD:</label>
                   <select 
                     id="format"
                     value={exportFormat}
                     onChange={(e) => setExportFormat(e.target.value as 'MP3' | 'WAV')}
-                    className="border border-gray-300 rounded-lg text-sm px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none flex-1 sm:flex-none cursor-pointer"
+                    className="border border-white/10 rounded-xl text-sm px-4 py-2 bg-black/40 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none flex-1 md:flex-none cursor-pointer"
                   >
-                    <option value="MP3">MP3 (Menor tamaño)</option>
-                    <option value="WAV">WAV (Sin pérdida)</option>
+                    <option value="MP3">MP3 (320 kbps)</option>
+                    <option value="WAV">WAV (24-bit 48kHz Sin pérdida)</option>
                   </select>
                 </div>
-                <button className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm w-full sm:w-auto">
+                <button className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-3 rounded-xl font-bold hover:from-indigo-400 hover:to-purple-500 transition-all shadow-[0_0_20px_rgba(99,102,241,0.3)] w-full md:w-auto">
                   <Archive className="w-5 h-5" />
-                  Descargar todo (.ZIP)
+                  Descargar Multi-track (.ZIP)
                 </button>
               </div>
 
-              <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-sm text-blue-800">
-                <div className="mt-0.5"><Sparkles className="w-4 h-4" /></div>
-                <p>
+              <div className="mt-8 bg-blue-900/20 border border-blue-500/20 rounded-xl p-5 flex gap-3 text-sm text-blue-200 backdrop-blur-sm">
+                <div className="mt-0.5 text-blue-400"><Sparkles className="w-5 h-5" /></div>
+                <p className="leading-relaxed">
                   <strong>Demostración del frontend:</strong> En esta versión alojada, la subida y procesamiento se visualizan como maqueta (mockup). Para habilitar la separación real requiere conectarse a un modelo backend en Python (ej. Demucs o Spleeter).
                 </p>
               </div>
@@ -341,35 +395,35 @@ export default function App() {
               className="w-full max-w-2xl"
             >
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold tracking-tight mb-3">Clonador de Voz IA</h2>
-                <p className="text-gray-600">Graba o sube tu voz y la IA la convertirá para que suene exactamente como tu artista favorito.</p>
+                <h2 className="text-4xl font-bold tracking-tight mb-3 text-white drop-shadow-md">Clonador de Voz IA</h2>
+                <p className="text-gray-400 text-lg">Graba o sube tu voz y la IA la convertirá para que suene exactamente como tu artista favorito.</p>
               </div>
 
               <div 
-                className="border-2 border-dashed border-gray-300 rounded-2xl p-12 bg-white flex flex-col items-center justify-center text-center hover:bg-gray-50 hover:border-purple-400 transition-colors shadow-sm"
+                className="border-2 border-dashed border-white/10 rounded-3xl p-12 bg-[#121217]/50 backdrop-blur-sm flex flex-col items-center justify-center text-center hover:bg-[#1a1a24]/50 hover:border-purple-500/50 transition-all shadow-2xl"
               >
-                <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mb-4 transition-transform hover:scale-110 cursor-pointer">
-                  <Mic className="w-8 h-8" />
+                <div className="w-20 h-20 bg-purple-500/10 text-purple-400 rounded-full flex items-center justify-center mb-6 transition-all hover:scale-110 hover:bg-purple-500/20 cursor-pointer shadow-[0_0_15px_rgba(168,85,247,0.1)]">
+                  <Mic className="w-10 h-10" />
                 </div>
-                <h3 className="text-lg font-semibold mb-1">Canta o habla al micrófono</h3>
-                <p className="text-sm text-gray-500 mb-6">Permite usar el micrófono para grabar directamente</p>
+                <h3 className="text-xl font-semibold mb-2 text-white">Canta o habla al micrófono</h3>
+                <p className="text-sm text-gray-500 mb-8">Permite usar el micrófono para grabar directamente o importar tu voz</p>
                 
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-5">
                   <button 
                     onClick={() => {
                       // Fake recording flow for demo
                       setStudioStatus('done');
                       setStudioFile(new File([], "grabacion_voz_01.wav"));
                     }}
-                    className="bg-red-500 text-white px-6 py-2.5 rounded-full font-medium hover:bg-red-600 transition-colors flex items-center gap-2"
+                    className="bg-red-500/20 border border-red-500/50 text-red-500 px-8 py-3 rounded-full font-medium hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 shadow-lg shadow-red-500/10"
                   >
-                    <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                    <div className="w-3 h-3 bg-current rounded-full animate-pulse shadow-[0_0_8px_currentColor]"></div>
                     Comenzar a Grabar
                   </button>
-                  <div className="flex items-center text-gray-400 text-sm">o</div>
+                  <div className="flex items-center text-gray-600 text-sm font-medium">O</div>
                   <button 
                     onClick={() => studioFileInputRef.current?.click()}
-                    className="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-full font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+                    className="bg-white/5 border border-white/10 text-white px-8 py-3 rounded-full font-medium hover:bg-white/10 transition-all flex items-center gap-2"
                   >
                     <Upload className="w-4 h-4" />
                     Subir Archivo
@@ -393,23 +447,23 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.05 }}
-              className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-center"
+              className="w-full max-w-md bg-[#121217]/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white/10 text-center mx-auto"
             >
               <div className="relative w-24 h-24 mx-auto mb-6">
-                <svg className="w-full h-full text-gray-200" viewBox="0 0 100 100">
+                <svg className="w-full h-full text-gray-800" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" />
                 </svg>
-                <svg className="w-full h-full text-purple-600 absolute top-0 left-0 -rotate-90" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray={`${progress * 2.83} 283`} className="transition-all duration-300 ease-out" />
+                <svg className="w-full h-full text-purple-500 absolute top-0 left-0 -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray={`${progress * 2.83} 283`} className="transition-all duration-300 ease-out drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-purple-600">
+                <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-purple-400">
                   {progress}%
                 </div>
               </div>
-              <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2">
-                <Wand2 className="w-5 h-5 text-purple-500" /> Aplicando modelos de IA...
+              <h3 className="text-xl font-bold mb-2 flex items-center justify-center gap-2 text-white">
+                <Wand2 className="w-5 h-5 text-purple-400" /> Aplicando modelos de IA...
               </h3>
-              <p className="text-gray-500 text-sm">Mejorando acústica y procesando efectos</p>
+              <p className="text-gray-400 text-sm">Mejorando acústica y procesando efectos</p>
             </motion.div>
           )}
 
@@ -422,54 +476,46 @@ export default function App() {
             >
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight">Editor de Audio en Vivo</h2>
-                  <p className="text-gray-500 text-sm">Archivo: <span className="font-medium text-gray-700">{studioFile?.name}</span></p>
+                  <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm">Editor de Audio en Vivo</h2>
+                  <p className="text-gray-400 text-sm">Archivo: <span className="font-medium text-gray-200">{studioFile?.name}</span></p>
                 </div>
                 <button 
                   onClick={resetStudio}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors text-gray-700"
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors text-gray-300"
                 >
                   Cambiar archivo
                 </button>
               </div>
 
               {/* Editor en Vivo */}
-              <div className="bg-gray-900 rounded-2xl p-6 shadow-lg mb-6 overflow-hidden relative">
-                <div className="flex justify-between items-center mb-4 text-gray-400">
+              <div className="bg-[#0f0f13]/80 backdrop-blur-md rounded-2xl p-6 shadow-[0_0_30px_rgba(0,0,0,0.5)] mb-6 overflow-hidden relative border border-white/5">
+                <div className="flex justify-between items-center mb-4 text-gray-500 font-mono text-sm">
                   <div className="flex gap-4">
                     <button className="hover:text-white transition-colors">0:00</button>
                     <button className="hover:text-white transition-colors">0:15</button>
                     <button className="hover:text-white transition-colors">0:30</button>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                    <span className="text-sm font-medium">Motor de audio activo</span>
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-red-500/80">Motor Activo</span>
                   </div>
                 </div>
 
-                {/* Waveform Fake */}
-                <div className="h-32 flex items-center gap-1 w-full opacity-80 overflow-hidden px-2 mb-6">
-                  {Array.from({ length: 120 }).map((_, i) => (
-                    <div 
-                      key={i} 
-                      className="w-1.5 bg-gradient-to-t from-purple-500 to-indigo-400 rounded-full"
-                      style={{ 
-                        height: `${Math.max(10, Math.sin(i * 0.2) * 50 + Math.random() * 40 + 10)}%`,
-                        opacity: i % 10 === 0 ? 0.5 : 1
-                      }}
-                    ></div>
-                  ))}
-                </div>
+                {/* Waveform Real-time */}
+                <LiveWaveform isPlaying={isStudioPlaying} />
 
                 {/* Controles de Reproducción */}
                 <div className="flex justify-center items-center gap-6">
-                  <button className="p-3 text-white hover:bg-white/10 rounded-full transition-colors">
+                  <button className="p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
                   </button>
-                  <button className="p-4 bg-white text-gray-900 hover:bg-gray-200 rounded-full transition-colors shadow-lg shadow-white/10">
-                    <Play className="w-6 h-6 fill-current" />
+                  <button 
+                    onClick={() => setIsStudioPlaying(!isStudioPlaying)}
+                    className="p-4 bg-white text-gray-900 hover:bg-gray-200 rounded-full transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:scale-105"
+                  >
+                    {isStudioPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
                   </button>
-                  <button className="p-3 text-white hover:bg-white/10 rounded-full transition-colors">
+                  <button className="p-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
                   </button>
                 </div>
@@ -479,14 +525,14 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Panel Mejora de Estudio */}
-                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                <div className="bg-[#121217]/50 backdrop-blur-sm border border-white/5 rounded-2xl p-6 shadow-xl">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-green-100 text-green-700 rounded-lg">
+                    <div className="p-2 bg-green-500/10 text-green-400 rounded-xl shadow-[0_0_10px_rgba(74,222,128,0.1)]">
                       <Sparkles className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900">Mejora de Estudio (Podcast/Voz)</h3>
-                      <p className="text-sm text-gray-500">Reducción de ruido y ecualización IA</p>
+                      <h3 className="font-bold text-white">Mejora de Estudio (Podcast/Voz)</h3>
+                      <p className="text-sm text-gray-400">Reducción de ruido y ecualización IA</p>
                     </div>
                     <label className="ml-auto inline-flex items-center cursor-pointer">
                       <input 
@@ -495,37 +541,37 @@ export default function App() {
                         checked={aiEnhancement}
                         onChange={(e) => setAiEnhancement(e.target.checked)}
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none ring-4 ring-transparent rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                      <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                     </label>
                   </div>
 
                   <div className={`space-y-4 transition-opacity ${!aiEnhancement ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-gray-700">Aislamiento de voz</span>
-                        <span className="text-gray-500">Intenso</span>
+                        <span className="font-medium text-gray-300">Aislamiento de voz</span>
+                        <span className="text-gray-500 font-mono">Intenso</span>
                       </div>
-                      <input type="range" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" defaultValue="85" />
+                      <input type="range" className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-green-500" defaultValue="85" />
                     </div>
                     <div>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-gray-700">Compresión de Estudio</span>
-                        <span className="text-gray-500">Radio 4:1</span>
+                        <span className="font-medium text-gray-300">Compresión de Estudio</span>
+                        <span className="text-gray-500 font-mono">Ratio 4:1</span>
                       </div>
-                      <input type="range" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" defaultValue="60" />
+                      <input type="range" className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-green-500" defaultValue="60" />
                     </div>
                   </div>
                 </div>
 
                 {/* Panel Cambiador de Voz */}
-                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
+                <div className="bg-[#121217]/50 backdrop-blur-sm border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-purple-100 text-purple-700 rounded-lg">
+                    <div className="p-2 bg-purple-500/10 text-purple-400 rounded-xl shadow-[0_0_10px_rgba(168,85,247,0.1)]">
                       <Wand2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900">Cover IA (Voces de Artistas)</h3>
-                      <p className="text-sm text-gray-500">Haz que tu voz suene como tus cantantes favoritos</p>
+                      <h3 className="font-bold text-white">Cover IA (Voces de Artistas)</h3>
+                      <p className="text-sm text-gray-400">Haz que tu voz suene como tus cantantes favoritos</p>
                     </div>
                   </div>
 
@@ -541,10 +587,10 @@ export default function App() {
                       <button
                         key={effect.id}
                         onClick={() => setVoiceEffect(effect.id)}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
+                        className={`px-3 py-2 text-sm font-medium rounded-xl border transition-all ${
                           voiceEffect === effect.id 
-                            ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm ring-1 ring-purple-500' 
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-purple-200 hover:bg-gray-50'
+                            ? 'border-purple-500/50 bg-purple-500/10 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.1)]' 
+                            : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 hover:bg-white/10 hover:text-gray-200'
                         }`}
                       >
                         {effect.label}
@@ -571,12 +617,74 @@ export default function App() {
 
                 </div>
 
+                {/* Panel Efectos Espaciales */}
+                <div className="bg-[#121217]/50 backdrop-blur-sm border border-white/5 rounded-2xl p-6 shadow-xl md:col-span-2">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl shadow-[0_0_10px_rgba(99,102,241,0.1)]">
+                      <Waves className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white">Efectos Espaciales</h3>
+                      <p className="text-sm text-gray-400">Ajusta Reverb y Delay para mayor profundidad</p>
+                    </div>
+                    <label className="ml-auto inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={spatialEffects}
+                        onChange={(e) => setSpatialEffects(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                    </label>
+                  </div>
+
+                  <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-opacity ${!spatialEffects ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {/* Controles de Reverb */}
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-gray-300 border-b border-white/10 pb-2">Reverb</h4>
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-gray-400">Mix (Mezcla)</span>
+                          <span className="text-gray-500 font-mono">{reverbMix}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value={reverbMix} onChange={e => setReverbMix(Number(e.target.value))} className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-gray-400">Decay Time</span>
+                          <span className="text-gray-500 font-mono">{reverbDecay}s</span>
+                        </div>
+                        <input type="range" min="0.1" max="5" step="0.1" value={reverbDecay} onChange={e => setReverbDecay(Number(e.target.value))} className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                      </div>
+                    </div>
+
+                    {/* Controles de Delay */}
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-gray-300 border-b border-white/10 pb-2">Delay</h4>
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-gray-400">Mix (Mezcla)</span>
+                          <span className="text-gray-500 font-mono">{delayMix}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value={delayMix} onChange={e => setDelayMix(Number(e.target.value))} className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-gray-400">Feedback</span>
+                          <span className="text-gray-500 font-mono">{delayFeedback}%</span>
+                        </div>
+                        <input type="range" min="0" max="100" value={delayFeedback} onChange={e => setDelayFeedback(Number(e.target.value))} className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
               
               <div className="mt-8 flex justify-end">
                 <button 
                   onClick={startStudioProcess}
-                  className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors shadow-sm"
+                  className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)]"
                 >
                   <Download className="w-5 h-5" />
                   Renderizar y Descargar (MP3)
@@ -595,45 +703,85 @@ export default function App() {
             >
               {/* Left Column: AI Ghostwriter */}
               <div className="w-full lg:w-1/3 flex flex-col gap-6">
-                <div className="bg-white border md:border-gray-200 rounded-2xl shadow-sm p-6 flex-1 flex flex-col">
+                
+                {/* Panel Letras IA */}
+                <div className="bg-[#121217]/50 backdrop-blur-sm border border-white/5 rounded-2xl shadow-xl p-6 flex flex-col h-1/2">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                    <div className="p-2 bg-blue-500/10 text-blue-400 rounded-xl shadow-[0_0_10px_rgba(59,130,246,0.1)]">
                       <Type className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900">Letras IA</h3>
-                      <p className="text-sm text-gray-500">Genera versos y rimas</p>
+                      <h3 className="font-bold text-white">Letras IA</h3>
+                      <p className="text-sm text-gray-400">Genera versos y rimas</p>
                     </div>
                   </div>
 
                   <div className="mb-4 relative">
                     <textarea 
-                      placeholder="Ej: Letra de trap sobre el desamor y el éxito..."
+                      placeholder="Ej: Letra de rap sobre ganar..."
                       value={lyricsPrompt}
                       onChange={(e) => setLyricsPrompt(e.target.value)}
-                      className="w-full h-24 p-3 text-sm border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full h-24 p-3 text-sm border border-white/10 bg-black/40 text-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-gray-600"
                     />
                     <button 
                       onClick={generateLyrics}
                       disabled={!lyricsPrompt || isGeneratingLyrics}
-                      className="absolute bottom-3 right-3 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="absolute bottom-3 right-3 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-lg shadow-blue-500/30"
                     >
                       {isGeneratingLyrics ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </button>
                   </div>
 
-                  <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 p-4 relative overflow-y-auto min-h-[200px]">
+                  <div className="flex-1 bg-black/40 rounded-xl border border-white/5 p-4 relative overflow-y-auto min-h-[150px]">
                     {generatedLyrics ? (
-                      <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap font-medium">
+                      <pre className="text-sm font-mono text-gray-300 whitespace-pre-wrap">
                         {generatedLyrics}
                       </pre>
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-                        La letra generada aparecerá aquí
+                      <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-sm">
+                        La letra aparecerá aquí
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* Panel Mastering de Estudio AI */}
+                <div className="bg-[#121217]/50 backdrop-blur-sm border border-white/5 rounded-2xl shadow-xl p-6 flex-col flex h-1/2 mt-auto">
+                   <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-purple-500/10 text-purple-400 rounded-xl shadow-[0_0_10px_rgba(168,85,247,0.1)]">
+                      <Sliders className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white">Mastering Studio AI</h3>
+                      <p className="text-sm text-gray-400">Automatiza la mezcla final</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1.5">
+                        <span className="font-medium text-gray-300 text-xs uppercase tracking-wider">Compresión Final</span>
+                      </div>
+                      <input type="range" className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-500" defaultValue="70" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1.5">
+                        <span className="font-medium text-gray-300 text-xs uppercase tracking-wider">Ecualizador Inteligente</span>
+                      </div>
+                      <input type="range" className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-500" defaultValue="50" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1.5">
+                        <span className="font-medium text-gray-300 text-xs uppercase tracking-wider">Limitador de Volumen</span>
+                      </div>
+                      <input type="range" className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-500" defaultValue="90" />
+                    </div>
+                  </div>
+                  <button className="w-full mt-6 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-semibold tracking-wide border border-white/10 transition-colors flex items-center justify-center gap-2">
+                     <Sparkles className="w-4 h-4" /> Finalizar Master
+                  </button>
+                </div>
+
               </div>
 
               {/* Right Column: FL Studio Clone */}
@@ -757,7 +905,7 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <footer className="py-4 text-center text-xs text-gray-500 border-t border-gray-200 bg-white mt-auto">
+      <footer className="py-6 text-center text-xs text-gray-500 border-t border-white/5 bg-[#09090b] mt-auto relative z-10 backdrop-blur-md">
         &copy; {new Date().getFullYear()} AudioStudio AI. Licencia MIT. Construido para demostrar el uso de IA en producción musical.
       </footer>
     </div>
