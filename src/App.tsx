@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Music, Mic, Drum, Guitar, Waves, Download, Play, Pause, Loader2, Sparkles, FileAudio, Archive, Sliders, Wand2, AudioWaveform } from 'lucide-react';
+import { Upload, Music, Mic, Drum, Guitar, Waves, Download, Play, Pause, Loader2, Sparkles, FileAudio, Archive, Sliders, Wand2, AudioWaveform, Piano, LayoutGrid, Type, Send, Settings, FastForward } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type ProcessStatus = 'idle' | 'uploading' | 'processing' | 'done';
-type AppTab = 'separator' | 'studio';
+type AppTab = 'separator' | 'studio' | 'producer';
 
 interface Stem {
   name: string;
@@ -33,6 +33,19 @@ export default function App() {
   const [voiceEffect, setVoiceEffect] = useState<string>('none');
   const [aiEnhancement, setAiEnhancement] = useState<boolean>(true);
   const studioFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Producer State
+  const [lyricsPrompt, setLyricsPrompt] = useState<string>('');
+  const [generatedLyrics, setGeneratedLyrics] = useState<string>('');
+  const [isGeneratingLyrics, setIsGeneratingLyrics] = useState(false);
+  const [beatPrompt, setBeatPrompt] = useState<string>('');
+  const [isGeneratingBeat, setIsGeneratingBeat] = useState(false);
+  const [isPlayingBeat, setIsPlayingBeat] = useState(false);
+  const [bpm, setBpm] = useState<number>(95);
+  
+  // Matrix for FL Studio clone (simplified)
+  const tracks = ['Kick', 'Snare', 'Hi-Hat', '808 Bass', 'Synth', 'Vocals'];
+  const steps = Array.from({ length: 16 });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -86,6 +99,24 @@ export default function App() {
       });
     }, 100);
   };
+  
+  const generateLyrics = () => {
+    if (!lyricsPrompt) return;
+    setIsGeneratingLyrics(true);
+    setTimeout(() => {
+      setGeneratedLyrics(`(Intro)\nYeah, yeah\nDirecto desde arriba\nTú sabes quién...\n\n(Coro)\nMe dejaste en visto pero estoy brillando\nFlow cabrón, la calle la tamo' controlando\nTú te fuiste y ahora todos me están tirando\nPero sigo firme, billetes contando\n\n(Verso)\nTrataste de opacarme pero nací estrella\nTu recuerdo se borró como la huella\nEn la arena, cuando sube la marea...\nLa combi completa siempre me sella.`);
+      setIsGeneratingLyrics(false);
+    }, 2000);
+  };
+  
+  const generateBeat = () => {
+    if (!beatPrompt) return;
+    setIsGeneratingBeat(true);
+    setTimeout(() => {
+      setIsGeneratingBeat(false);
+      setIsPlayingBeat(true);
+    }, 2500);
+  };
 
   const reset = () => {
     setStatus('idle');
@@ -104,7 +135,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans selection:bg-indigo-100 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 py-4">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-600 rounded-lg text-white">
               <AudioWaveform className="w-6 h-6" />
@@ -115,27 +146,34 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex bg-gray-100 p-1 rounded-xl">
+          <div className="flex flex-wrap bg-gray-100 p-1 rounded-xl">
             <button 
               onClick={() => setActiveTab('separator')}
               className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'separator' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
             >
               <Music className="w-4 h-4" />
-              Separador de Pistas
+              Separador
             </button>
             <button 
               onClick={() => setActiveTab('studio')}
               className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'studio' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
             >
               <Mic className="w-4 h-4" />
-              Estudio de Voz IA
+              Estudio de Voz
+            </button>
+            <button 
+              onClick={() => setActiveTab('producer')}
+              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'producer' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              <Piano className="w-4 h-4" />
+              Productor IA / Beatmaker
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-12 flex flex-col items-center justify-center">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-8 flex flex-col">
         <AnimatePresence mode="wait">
           {activeTab === 'separator' && status === 'idle' && (
             <motion.div
@@ -143,7 +181,7 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="w-full max-w-2xl"
+              className="w-full max-w-2xl mx-auto my-auto"
             >
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold tracking-tight mb-3">Extrae voces e instrumentos</h2>
@@ -548,11 +586,179 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'producer' && (
+            <motion.div
+              key="producer-tab"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full flex flex-col lg:flex-row gap-6 mt-4"
+            >
+              {/* Left Column: AI Ghostwriter */}
+              <div className="w-full lg:w-1/3 flex flex-col gap-6">
+                <div className="bg-white border md:border-gray-200 rounded-2xl shadow-sm p-6 flex-1 flex flex-col">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                      <Type className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900">Letras IA</h3>
+                      <p className="text-sm text-gray-500">Genera versos y rimas</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 relative">
+                    <textarea 
+                      placeholder="Ej: Letra de trap sobre el desamor y el éxito..."
+                      value={lyricsPrompt}
+                      onChange={(e) => setLyricsPrompt(e.target.value)}
+                      className="w-full h-24 p-3 text-sm border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button 
+                      onClick={generateLyrics}
+                      disabled={!lyricsPrompt || isGeneratingLyrics}
+                      className="absolute bottom-3 right-3 bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isGeneratingLyrics ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 p-4 relative overflow-y-auto min-h-[200px]">
+                    {generatedLyrics ? (
+                      <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap font-medium">
+                        {generatedLyrics}
+                      </pre>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+                        La letra generada aparecerá aquí
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: FL Studio Clone */}
+              <div className="w-full lg:w-2/3 flex flex-col gap-6">
+                <div className="bg-[#1e1e24] border border-gray-800 rounded-2xl shadow-xl p-4 flex-1 flex flex-col text-gray-300 font-mono">
+                  {/* Top Toolbar */}
+                  <div className="flex flex-wrap items-center justify-between border-b border-gray-700 pb-4 mb-4 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="text-[#ff6b00]">
+                        <LayoutGrid className="w-6 h-6" />
+                      </div>
+                      <span className="font-bold text-white text-lg tracking-tight">AI Studio <span className="opacity-50">v24</span></span>
+                    </div>
+
+                    <div className="flex items-center gap-4 bg-black/30 p-2 rounded-lg border border-gray-700/50">
+                      <div className="flex items-center gap-2 px-3">
+                        <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">BPM</span>
+                        <input 
+                          type="number" 
+                          value={bpm} 
+                          onChange={(e) => setBpm(Number(e.target.value))}
+                          className="bg-transparent text-amber-500 font-bold w-12 outline-none text-center" 
+                        />
+                      </div>
+                      <div className="w-px h-6 bg-gray-700"></div>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => setIsPlayingBeat(!isPlayingBeat)}
+                          className={`p-1.5 rounded transition-colors ${isPlayingBeat ? 'text-amber-500 bg-amber-500/20' : 'hover:bg-gray-700'}`}
+                        >
+                          {isPlayingBeat ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Beat Generation Prompt */}
+                  <div className="bg-[#2a2a35] rounded-xl p-4 mb-6 border border-gray-700 flex flex-col md:flex-row gap-3 items-center relative overflow-hidden">
+                    {/* Fake Loading Overlay inside generator */}
+                    {isGeneratingBeat && (
+                      <div className="absolute inset-0 bg-[#2a2a35]/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                        <span className="text-amber-500 mb-2"><Loader2 className="w-6 h-6 animate-spin" /></span>
+                        <span className="text-xs text-amber-500/80 uppercase tracking-widest font-bold">Generando Secuencia...</span>
+                      </div>
+                    )}
+                    
+                    <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg text-white shrink-0 shadow-lg">
+                      <Wand2 className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 w-full">
+                      <input 
+                        type="text" 
+                        placeholder="Describe un beat para generar los patrones (ej. Drill oscuro tipo Pop Smoke)"
+                        value={beatPrompt}
+                        onChange={(e) => setBeatPrompt(e.target.value)}
+                        className="w-full bg-black/40 border border-gray-600 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors placeholder:text-gray-500"
+                        onKeyDown={(e) => e.key === 'Enter' && generateBeat()}
+                      />
+                    </div>
+                    <button 
+                      onClick={generateBeat}
+                      disabled={!beatPrompt || isGeneratingBeat}
+                      className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed uppercase shrink-0 w-full md:w-auto tracking-wide"
+                    >
+                      Generar Beat
+                    </button>
+                  </div>
+
+                  {/* Sequencer Grid */}
+                  <div className="flex-1 overflow-x-auto overflow-y-auto">
+                    <div className="min-w-max border border-gray-800 rounded-lg overflow-hidden bg-black/20">
+                      {/* Timeline Header */}
+                      <div className="flex border-b border-gray-800 bg-[#1a1a20]">
+                        <div className="w-24 shrink-0 border-r border-gray-800 flex items-center justify-center">
+                          <Settings className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <div className="flex-1 flex">
+                          {steps.map((_, i) => (
+                            <div key={i} className={`flex-1 h-6 border-r border-gray-800/50 flex items-end px-1 pb-0.5 ${i % 4 === 0 ? 'bg-white/5' : ''}`}>
+                              {i % 4 === 0 && <span className="text-[10px] text-gray-500">{i/4 + 1}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Tracks */}
+                      {tracks.map((track, trackIndex) => (
+                        <div key={track} className="flex border-b border-gray-800/80 group hover:bg-white/5">
+                          {/* Track Info */}
+                          <div className="w-24 shrink-0 border-r border-gray-800 bg-[#25252e] flex items-center px-2 z-10 transition-colors">
+                            <span className="text-[11px] font-semibold text-gray-300 truncate" title={track}>{track}</span>
+                          </div>
+                          {/* Step Buttons */}
+                          <div className="flex-1 flex cursor-pointer">
+                            {steps.map((_, stepIndex) => {
+                              // Simulate generated steps if beat is "playing" or generated
+                              // Purely aesthetic for the mock
+                              const isActive = isPlayingBeat && Math.random() > (trackIndex === 0 ? 0.7 : 0.85);
+
+                              return (
+                                <div 
+                                  key={stepIndex} 
+                                  className={`flex-1 h-10 border-r border-gray-800/30 m-[1px] md:m-[2px] rounded-sm transition-colors duration-75
+                                    ${stepIndex % 4 === 0 ? 'border-l-gray-700' : ''} 
+                                    ${isActive ? 'bg-gradient-to-b from-[#ff8c00] to-[#e04000] shadow-[0_0_8px_rgba(255,140,0,0.4)]' : 'bg-[#32323e] hover:bg-[#404050]'}`
+                                  }
+                                ></div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </main>
 
-      <footer className="py-6 text-center text-sm text-gray-400 border-t border-gray-100 bg-white mt-auto">
-        &copy; {new Date().getFullYear()} AudioStudio AI. Licencia MIT.
+      <footer className="py-4 text-center text-xs text-gray-500 border-t border-gray-200 bg-white mt-auto">
+        &copy; {new Date().getFullYear()} AudioStudio AI. Licencia MIT. Construido para demostrar el uso de IA en producción musical.
       </footer>
     </div>
   );
