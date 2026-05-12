@@ -548,7 +548,7 @@ export default function App() {
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
-                  accept="audio/*" 
+                  accept="audio/*, .mp3, .wav, .flac, .m4a" 
                   onChange={handleFileSelect} 
                 />
               </div>
@@ -719,7 +719,7 @@ export default function App() {
                   type="file" 
                   ref={studioFileInputRef} 
                   className="hidden" 
-                  accept="audio/*" 
+                  accept="audio/*, .mp3, .wav, .flac, .m4a" 
                   onChange={handleStudioFileSelect} 
                 />
               </div>
