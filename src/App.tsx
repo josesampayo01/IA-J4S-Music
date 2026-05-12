@@ -186,6 +186,62 @@ export default function App() {
   const [exportFormat, setExportFormat] = useState<'MP3' | 'WAV'>('MP3');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [detectedBpm, setDetectedBpm] = useState<string>('');
+  const [detectedKey, setDetectedKey] = useState<string>('');
+
+  const separatorAudioRef = useRef<HTMLAudioElement | null>(null);
+  const separatorFilterRef = useRef<BiquadFilterNode | null>(null);
+
+  // Separator Audio Initialization
+  useEffect(() => {
+    if (file && status === 'done' && !separatorAudioRef.current) {
+        separatorAudioRef.current = new Audio();
+        separatorAudioRef.current.loop = true;
+        separatorAudioRef.current.src = URL.createObjectURL(file);
+
+        const ctx = getAudioCtx();
+        if (ctx) {
+            const source = ctx.createMediaElementSource(separatorAudioRef.current);
+            const filter = ctx.createBiquadFilter();
+            source.connect(filter);
+            filter.connect(ctx.destination);
+            separatorFilterRef.current = filter;
+        }
+    }
+  }, [file, status]);
+
+  // Separator playback logic
+  useEffect(() => {
+    if (!separatorAudioRef.current || !separatorFilterRef.current) return;
+
+    if (playingStem) {
+        getAudioCtx()?.resume();
+        separatorAudioRef.current.play().catch(console.error);
+
+        const filter = separatorFilterRef.current;
+        // Mock eq filtering to sound like stems
+        if (playingStem === 'Voces') {
+            filter.type = 'bandpass';
+            filter.frequency.value = 1500;
+            filter.Q.value = 1.0;
+        } else if (playingStem === 'Batería') {
+            filter.type = 'lowshelf';
+            filter.frequency.value = 500;
+            filter.gain.value = 10;
+        } else if (playingStem === 'Bajo') {
+            filter.type = 'lowpass';
+            filter.frequency.value = 150;
+            filter.Q.value = 2.0;
+        } else {
+            filter.type = 'highpass';
+            filter.frequency.value = 1000;
+            filter.Q.value = 1.0;
+        }
+    } else {
+        separatorAudioRef.current.pause();
+    }
+  }, [playingStem]);
+
   // Estudio State
   const [studioStatus, setStudioStatus] = useState<ProcessStatus>('idle');
   const [studioFile, setStudioFile] = useState<File | null>(null);
@@ -395,6 +451,11 @@ export default function App() {
     setProgress(0);
     setPlayingStem(null);
     
+    // Simulate generation of BPM and Key
+    const keys = ['Am', 'C Mayor', 'G Menor', 'F#m', 'E Mayor', 'D Menor', 'Bm', 'C# Mayor'];
+    setDetectedBpm(Math.floor(Math.random() * 40 + 90).toString());
+    setDetectedKey(keys[Math.floor(Math.random() * keys.length)]);
+    
     // Simular el proceso de subida y separación
     const interval = setInterval(() => {
       setProgress((p) => {
@@ -461,6 +522,13 @@ export default function App() {
     setFile(null);
     setProgress(0);
     setPlayingStem(null);
+    if (separatorAudioRef.current) {
+        separatorAudioRef.current.pause();
+        separatorAudioRef.current.src = "";
+        separatorAudioRef.current = null;
+    }
+    setDetectedBpm('');
+    setDetectedKey('');
   };
 
   const resetStudio = () => {
@@ -605,6 +673,27 @@ export default function App() {
                 >
                   Procesar nueva pista
                 </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                <div className="flex-1 bg-black/40 border border-white/5 rounded-2xl p-5 flex items-center gap-4 shadow-lg backdrop-blur-sm">
+                  <div className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl shadow-[0_0_10px_rgba(99,102,241,0.1)]">
+                    <AudioWaveform className="w-6 h-6"/>
+                  </div>
+                  <div>
+                    <p className="text-xs text-indigo-300 uppercase tracking-widest font-semibold mb-1">BPM Detectado</p>
+                    <p className="text-2xl font-bold text-white">{detectedBpm} <span className="text-sm font-medium text-gray-400">BPM</span></p>
+                  </div>
+                </div>
+                <div className="flex-1 bg-black/40 border border-white/5 rounded-2xl p-5 flex items-center gap-4 shadow-lg backdrop-blur-sm">
+                  <div className="p-3 bg-purple-500/10 text-purple-400 rounded-xl shadow-[0_0_10px_rgba(168,85,247,0.1)]">
+                    <Piano className="w-6 h-6"/>
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-300 uppercase tracking-widest font-semibold mb-1">Clave (Acorde)</p>
+                    <p className="text-2xl font-bold text-white">{detectedKey}</p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
