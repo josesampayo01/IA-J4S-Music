@@ -1,0 +1,32 @@
+name: Code Quality & Error Checking
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Type Checking (Buscar vulnerabilidades y tipos rotos)
+        run: npx tsc --noEmit
+
+      - name: Linting (Buscar malas prácticas y errores de sintaxis)
+        run: npm run lint
+
+      - name: Build Test (Asegurar que la app compila correctamente)
+        run: npm run build
