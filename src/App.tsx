@@ -1,6 +1,122 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Music, Mic, Drum, Guitar, Waves, Download, Play, Pause, Loader2, Sparkles, FileAudio, Archive, Sliders, Wand2, AudioWaveform, Piano, LayoutGrid, Type, Send, Settings, FastForward } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+// Web Audio Global Context
+let globalAudioCtx: AudioContext | null = null;
+const getAudioCtx = () => {
+    if (!window.AudioContext && !(window as any).webkitAudioContext) return null;
+    if (!globalAudioCtx) {
+        globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (globalAudioCtx.state === 'suspended') {
+        globalAudioCtx.resume();
+    }
+    return globalAudioCtx;
+};
+
+const createKick = (ctx: AudioContext, time: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.3);
+    gain.gain.setValueAtTime(1, time);
+    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
+    osc.start(time);
+    osc.stop(time + 0.3);
+};
+
+const createSnare = (ctx: AudioContext, time: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(250, time);
+    gain.gain.setValueAtTime(0.5, time);
+    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+    osc.start(time);
+    osc.stop(time + 0.2);
+    const bufferSize = ctx.sampleRate * 0.2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 1000;
+    noise.connect(noiseFilter);
+    const noiseGain = ctx.createGain();
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    noiseGain.gain.setValueAtTime(0.5, time);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+    noise.start(time);
+};
+
+const createHiHat = (ctx: AudioContext, time: number) => {
+    const bufferSize = ctx.sampleRate * 0.1;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const bandpass = ctx.createBiquadFilter();
+    bandpass.type = 'bandpass';
+    bandpass.frequency.value = 10000;
+    noise.connect(bandpass);
+    const gain = ctx.createGain();
+    bandpass.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.3, time);
+    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+    noise.start(time);
+};
+
+const createBass = (ctx: AudioContext, time: number, step: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(50, time);
+    gain.gain.setValueAtTime(0.8, time);
+    gain.gain.linearRampToValueAtTime(0.01, time + 0.4);
+    osc.start(time);
+    osc.stop(time + 0.4);
+};
+
+const createSynth = (ctx: AudioContext, time: number, step: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.connect(gain);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(500, time);
+    filter.frequency.exponentialRampToValueAtTime(2000, time + 0.1);
+    gain.connect(filter);
+    filter.connect(ctx.destination);
+    const notes = [220, 261.63, 293.66, 329.63, 392.00];
+    osc.frequency.setValueAtTime(notes[step % notes.length], time);
+    gain.gain.setValueAtTime(0.15, time);
+    gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+    osc.start(time);
+    osc.stop(time + 0.2);
+};
+
+const playSoundsForStep = (step: number, currentGrid: boolean[][]) => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime + 0.02;
+    if (currentGrid[0][step]) createKick(ctx, t);
+    if (currentGrid[1][step]) createSnare(ctx, t);
+    if (currentGrid[2][step]) createHiHat(ctx, t);
+    if (currentGrid[3][step]) createBass(ctx, t, step);
+    if (currentGrid[4][step]) createSynth(ctx, t, step);
+};
 
 type ProcessStatus = 'idle' | 'uploading' | 'processing' | 'done';
 type AppTab = 'separator' | 'studio' | 'producer';
@@ -91,7 +207,123 @@ export default function App() {
   const [isGeneratingBeat, setIsGeneratingBeat] = useState(false);
   const [isPlayingBeat, setIsPlayingBeat] = useState(false);
   const [bpm, setBpm] = useState<number>(95);
-  
+  const [currentStep, setCurrentStep] = useState<number>(-1);
+  const [grid, setGrid] = useState<boolean[][]>(() => {
+    const defaultGrid = Array.from({ length: 6 }, () => Array(16).fill(false));
+    defaultGrid[0][0] = true; defaultGrid[0][8] = true;
+    defaultGrid[1][4] = true; defaultGrid[1][12] = true;
+    for(let i=0; i<16; i+=2) defaultGrid[2][i] = true;
+    return defaultGrid;
+  });
+  const gridRef = useRef(grid);
+  useEffect(() => { gridRef.current = grid; }, [grid]);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const studioAudioRef = useRef<HTMLAudioElement | null>(null);
+  const effectChainRef = useRef<{
+    filter: BiquadFilterNode;
+    delay: DelayNode;
+    feedback: GainNode;
+    gain: GainNode;
+  } | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  // Initialize and route studio audio
+  useEffect(() => {
+    if (studioFile && !studioAudioRef.current) {
+        studioAudioRef.current = new Audio();
+        studioAudioRef.current.loop = true;
+        
+        const ctx = getAudioCtx();
+        if (ctx) {
+            mediaSourceRef.current = ctx.createMediaElementSource(studioAudioRef.current);
+            const filter = ctx.createBiquadFilter();
+            const delay = ctx.createDelay();
+            const feedback = ctx.createGain();
+            const gain = ctx.createGain();
+            
+            mediaSourceRef.current.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+            
+            filter.connect(delay);
+            delay.connect(feedback);
+            feedback.connect(delay);
+            delay.connect(gain);
+            
+            effectChainRef.current = { filter, delay, feedback, gain };
+        }
+    }
+    if (studioFile && studioAudioRef.current) {
+        studioAudioRef.current.src = URL.createObjectURL(studioFile);
+    }
+  }, [studioFile]);
+
+  // Update effects
+  useEffect(() => {
+    if (!effectChainRef.current) return;
+    const { filter, delay, feedback, gain } = effectChainRef.current;
+    
+    if (voiceEffect === 'bad_bunny') {
+        filter.type = 'lowshelf';
+        filter.frequency.value = 500;
+        filter.gain.value = 10;
+    } else if (voiceEffect === 'miky_woodz') {
+        filter.type = 'highpass';
+        filter.frequency.value = 1500;
+    } else if (voiceEffect === 'nengo_flow') {
+        filter.type = 'bandpass';
+        filter.frequency.value = 1000;
+    } else {
+        filter.type = 'allpass';
+    }
+    
+    if (spatialEffects) {
+        delay.delayTime.value = reverbDecay * 0.2;
+        feedback.gain.value = Math.min((delayFeedback / 100) * 0.9, 0.9); 
+        gain.gain.value = 1 - (delayMix / 100 * 0.5);
+    } else {
+        feedback.gain.value = 0;
+        gain.gain.value = 1;
+    }
+    
+  }, [voiceEffect, spatialEffects, delayFeedback, reverbMix, delayMix, reverbDecay]);
+
+  // Playback control
+  useEffect(() => {
+    if (isStudioPlaying) {
+        getAudioCtx();
+        studioAudioRef.current?.play().catch(e => console.error(e));
+    } else {
+        studioAudioRef.current?.pause();
+    }
+  }, [isStudioPlaying]);
+
+  // Sequencer Engine
+  useEffect(() => {
+    if (!isPlayingBeat) {
+        setCurrentStep(-1);
+        return;
+    }
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    
+    const intervalTime = (60 / bpm) * 1000 / 4;
+    let step = 0;
+    setCurrentStep(0);
+    playSoundsForStep(0, gridRef.current);
+    
+    const interval = setInterval(() => {
+      step = (step + 1) % 16;
+      setCurrentStep(step);
+      playSoundsForStep(step, gridRef.current);
+    }, intervalTime);
+    
+    return () => clearInterval(interval);
+  }, [isPlayingBeat, bpm]);
+
   // Matrix for FL Studio clone (simplified)
   const tracks = ['Kick', 'Snare', 'Hi-Hat', '808 Bass', 'Synth', 'Vocals'];
   const steps = Array.from({ length: 16 });
@@ -110,6 +342,32 @@ export default function App() {
       setStudioFile(selectedFile);
       setStudioStatus('done'); // Skip loading for demo purposes, straight to editor
     }
+  };
+
+  const toggleRecording = async () => {
+      if (isRecording) {
+          mediaRecorderRef.current?.stop();
+          mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+          setIsRecording(false);
+      } else {
+          try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              mediaRecorderRef.current = new MediaRecorder(stream);
+              mediaRecorderRef.current.ondataavailable = (e) => chunksRef.current.push(e.data);
+              mediaRecorderRef.current.onstop = () => {
+                  const blob = new Blob(chunksRef.current, { type: 'audio/ogg; codecs=opus' });
+                  const newFile = new File([blob], 'grabacion_voz.ogg', { type: blob.type });
+                  setStudioFile(newFile);
+                  setStudioStatus('done');
+                  chunksRef.current = [];
+              };
+              mediaRecorderRef.current.start();
+              setIsRecording(true);
+          } catch (e) {
+              console.error(e);
+              alert("No se pudo acceder al micrófono.");
+          }
+      }
   };
 
   const startProcess = () => {
@@ -163,6 +421,17 @@ export default function App() {
     setIsGeneratingBeat(true);
     setTimeout(() => {
       setIsGeneratingBeat(false);
+      
+      const newGrid = Array.from({ length: 6 }, () => Array(16).fill(false));
+      for (let s = 0; s < 16; s++) {
+         if (Math.random() > 0.6) newGrid[0][s] = true; // Kick
+         if (s % 8 === 4) newGrid[1][s] = true; // Snare
+         if (Math.random() > 0.3) newGrid[2][s] = true; // HiHats
+         if (Math.random() > 0.8) newGrid[3][s] = true; // Bass
+         if (Math.random() > 0.8) newGrid[4][s] = true; // Synth
+      }
+      setGrid(newGrid);
+
       setIsPlayingBeat(true);
     }, 2500);
   };
@@ -410,15 +679,11 @@ export default function App() {
                 
                 <div className="flex flex-col sm:flex-row gap-5">
                   <button 
-                    onClick={() => {
-                      // Fake recording flow for demo
-                      setStudioStatus('done');
-                      setStudioFile(new File([], "grabacion_voz_01.wav"));
-                    }}
-                    className="bg-red-500/20 border border-red-500/50 text-red-500 px-8 py-3 rounded-full font-medium hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 shadow-lg shadow-red-500/10"
+                    onClick={toggleRecording}
+                    className={`px-8 py-3 rounded-full font-medium transition-all flex items-center gap-2 shadow-lg ${isRecording ? 'bg-red-600 text-white shadow-red-500/20' : 'bg-red-500/20 border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white shadow-red-500/10'}`}
                   >
-                    <div className="w-3 h-3 bg-current rounded-full animate-pulse shadow-[0_0_8px_currentColor]"></div>
-                    Comenzar a Grabar
+                    <div className={`w-3 h-3 bg-current rounded-full shadow-[0_0_8px_currentColor] ${isRecording ? 'animate-pulse' : ''}`}></div>
+                    {isRecording ? 'Detener Grabación' : 'Comenzar a Grabar'}
                   </button>
                   <div className="flex items-center text-gray-600 text-sm font-medium">O</div>
                   <button 
@@ -877,16 +1142,23 @@ export default function App() {
                           {/* Step Buttons */}
                           <div className="flex-1 flex cursor-pointer">
                             {steps.map((_, stepIndex) => {
-                              // Simulate generated steps if beat is "playing" or generated
-                              // Purely aesthetic for the mock
-                              const isActive = isPlayingBeat && Math.random() > (trackIndex === 0 ? 0.7 : 0.85);
+                              const isActive = grid[trackIndex][stepIndex];
+                              const isCurrentStep = currentStep === stepIndex;
 
                               return (
                                 <div 
                                   key={stepIndex} 
+                                  onClick={() => {
+                                    const newGrid = [...grid];
+                                    newGrid[trackIndex] = [...newGrid[trackIndex]];
+                                    newGrid[trackIndex][stepIndex] = !newGrid[trackIndex][stepIndex];
+                                    setGrid(newGrid);
+                                  }}
                                   className={`flex-1 h-10 border-r border-gray-800/30 m-[1px] md:m-[2px] rounded-sm transition-colors duration-75
                                     ${stepIndex % 4 === 0 ? 'border-l-gray-700' : ''} 
-                                    ${isActive ? 'bg-gradient-to-b from-[#ff8c00] to-[#e04000] shadow-[0_0_8px_rgba(255,140,0,0.4)]' : 'bg-[#32323e] hover:bg-[#404050]'}`
+                                    ${isActive 
+                                      ? (isCurrentStep ? 'bg-[#ffeb3b] shadow-[0_0_12px_rgba(255,235,59,0.8)]' : 'bg-gradient-to-b from-[#ff8c00] to-[#e04000] shadow-[0_0_8px_rgba(255,140,0,0.4)]') 
+                                      : (isCurrentStep ? 'bg-[#404050]' : 'bg-[#32323e] hover:bg-[#404050]')}`
                                   }
                                 ></div>
                               );
