@@ -1,38 +1,6 @@
-import React, { useState, useRef, useEffect, Component, ReactNode } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Music, Mic, Drum, Guitar, Waves, Download, Play, Pause, Loader2, Sparkles, FileAudio, Archive, Sliders, Wand2, AudioWaveform, Piano, LayoutGrid, Type, Send, Settings, FastForward } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-// Error Boundary for Debugging
-class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
-  constructor(props: {children: ReactNode}) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-red-900 text-white p-10 flex flex-col items-center justify-center">
-          <h1 className="text-3xl font-bold mb-4">Something went wrong.</h1>
-          <pre className="bg-black/50 p-6 rounded-lg overflow-auto w-full max-w-4xl text-sm whitespace-pre-wrap">
-            {this.state.error?.toString()}
-            {'\n'}
-            {this.state.error?.stack}
-          </pre>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 // Web Audio Global Context
 let globalAudioCtx: AudioContext | null = null;
@@ -482,8 +450,7 @@ export default function App() {
   };
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-[#09090b] text-gray-100 font-sans selection:bg-indigo-500/30 flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#09090b] text-gray-100 font-sans selection:bg-indigo-500/30 flex flex-col relative overflow-hidden">
       {/* Background FX */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none z-0"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none z-0"></div>
@@ -1214,6 +1181,5 @@ export default function App() {
         &copy; {new Date().getFullYear()} AudioStudio AI. Licencia MIT. Construido para demostrar el uso de IA en producción musical.
       </footer>
     </div>
-    </ErrorBoundary>
   );
 }
