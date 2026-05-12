@@ -119,7 +119,7 @@ const playSoundsForStep = (step: number, currentGrid: boolean[][]) => {
 };
 
 type ProcessStatus = 'idle' | 'uploading' | 'processing' | 'done';
-type AppTab = 'separator' | 'studio' | 'producer';
+type AppTab = 'separator' | 'studio' | 'producer' | 'search';
 
 interface Stem {
   name: string;
@@ -222,20 +222,20 @@ export default function App() {
         // Mock eq filtering to sound like stems
         if (playingStem === 'Voces') {
             filter.type = 'bandpass';
-            filter.frequency.value = 1500;
-            filter.Q.value = 1.0;
+            filter.frequency.value = 1800;
+            filter.Q.value = 4.5; // High Q to isolate vocals, eliminating bass and highs
         } else if (playingStem === 'Batería') {
-            filter.type = 'lowshelf';
-            filter.frequency.value = 500;
-            filter.gain.value = 10;
+            filter.type = 'lowpass';
+            filter.frequency.value = 250;
+            filter.Q.value = 1.0; 
         } else if (playingStem === 'Bajo') {
             filter.type = 'lowpass';
-            filter.frequency.value = 150;
-            filter.Q.value = 2.0;
+            filter.frequency.value = 80;
+            filter.Q.value = 5.0; // Very sharp cut for bass guitar/808
         } else {
             filter.type = 'highpass';
-            filter.frequency.value = 1000;
-            filter.Q.value = 1.0;
+            filter.frequency.value = 4000;
+            filter.Q.value = 3.0; // Isolate cymbals/high synths
         }
     } else {
         separatorAudioRef.current.pause();
@@ -254,6 +254,11 @@ export default function App() {
   const [delayMix, setDelayMix] = useState<number>(20);
   const [delayFeedback, setDelayFeedback] = useState<number>(40);
   const studioFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Search Engine State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{title: string, desc: string}[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Producer State
   const [lyricsPrompt, setLyricsPrompt] = useState<string>('');
@@ -517,6 +522,21 @@ export default function App() {
     }, 2500);
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery) return;
+    setIsSearching(true);
+    
+    setTimeout(() => {
+        setIsSearching(false);
+        setSearchResults([
+            { title: "Mejores samples gratuitos para " + searchQuery, desc: "Aprende cómo usar la IA avanzada de J4S Records para modificar estos samples en segundos simulando procesamiento estilo Google DeepMind." },
+            { title: "Guía de Mezcla Profesional: Voces claras estilo " + searchQuery, desc: "Utiliza el algoritmo Quantico integrado para limpiar voces de cualquier ruido residual..." },
+            { title: "Instrumentales recomendados generados para " + searchQuery, desc: "Recursos generados por el motor de IA de J4S Records para potenciar tus producciones." },
+        ]);
+    }, 1500);
+  };
+
   const reset = () => {
     setStatus('idle');
     setFile(null);
@@ -538,46 +558,59 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-gray-100 font-sans selection:bg-indigo-500/30 flex flex-col relative overflow-hidden">
-      {/* Background FX */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[120px] rounded-full pointer-events-none z-0"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none z-0"></div>
-      <div className="absolute inset-0 bg-[url('https://i.imgur.com/3q174vj.png')] bg-repeat opacity-[0.03] z-0 pointer-events-none"></div>
+    <div className="min-h-screen bg-[#050508] text-gray-100 font-sans selection:bg-emerald-500/30 flex flex-col relative overflow-hidden">
+      {/* Background FX - NASA Deep Space Aesthetic */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-900/20 blur-[130px] rounded-full pointer-events-none z-0"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-900/20 blur-[150px] rounded-full pointer-events-none z-0"></div>
+      <div className="absolute top-[40%] left-[30%] w-[20%] h-[30%] bg-purple-900/10 blur-[100px] rounded-full pointer-events-none z-0"></div>
+      <div className="absolute inset-0 bg-[url('https://i.imgur.com/3q174vj.png')] bg-repeat opacity-[0.02] z-0 pointer-events-none mix-blend-overlay"></div>
 
       {/* Header */}
-      <header className="bg-[#0f0f13]/80 backdrop-blur-md border-b border-white/5 py-4 relative z-10 shadow-xl">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg text-white shadow-lg shadow-indigo-500/20">
-              <AudioWaveform className="w-6 h-6" />
+      <header className="bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-white/5 py-4 relative z-10 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-emerald-500 blur-md opacity-40 rounded-xl animate-pulse"></div>
+              <div className="p-3 bg-gradient-to-br from-gray-900 to-black border border-emerald-500/30 rounded-xl relative z-10">
+                <Sparkles className="w-6 h-6 text-emerald-400" />
+              </div>
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-sm">AudioStudio AI</h1>
-              <p className="text-sm text-gray-400">Herramientas profesionales de audio</p>
+              <h1 className="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-200 to-indigo-400 drop-shadow-sm uppercase">
+                J4S Music Records AI
+              </h1>
+              <p className="text-xs text-emerald-500/80 font-mono uppercase tracking-[0.2em]">Neural Engine Architecture v9.0</p>
             </div>
           </div>
           
-          <div className="flex flex-wrap bg-white/5 p-1.5 rounded-xl border border-white/5">
+          <div className="flex flex-wrap bg-black/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md shadow-inner">
             <button 
               onClick={() => setActiveTab('separator')}
-              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'separator' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
+              className={`px-5 py-2.5 flex items-center gap-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'separator' ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'text-gray-400 border border-transparent hover:text-emerald-300 hover:bg-white/5'}`}
             >
               <Music className="w-4 h-4" />
-              Separador
+              Separador Quantico
             </button>
             <button 
               onClick={() => setActiveTab('studio')}
-              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'studio' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
+              className={`px-5 py-2.5 flex items-center gap-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'studio' ? 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/30 text-purple-200 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'text-gray-400 border border-transparent hover:text-purple-300 hover:bg-white/5'}`}
             >
               <Mic className="w-4 h-4" />
-              Estudio de Voz
+              Clonador Universal
             </button>
             <button 
               onClick={() => setActiveTab('producer')}
-              className={`px-4 py-2 flex items-center gap-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'producer' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
+              className={`px-5 py-2.5 flex items-center gap-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'producer' ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 text-blue-200 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'text-gray-400 border border-transparent hover:text-blue-300 hover:bg-white/5'}`}
             >
-              <Piano className="w-4 h-4" />
-              Productor IA / Beatmaker
+              <Wand2 className="w-4 h-4" />
+              Productor IA
+            </button>
+            <button 
+              onClick={() => setActiveTab('search')}
+              className={`px-5 py-2.5 flex items-center gap-2 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'search' ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border border-yellow-500/30 text-yellow-200 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'text-gray-400 border border-transparent hover:text-yellow-300 hover:bg-white/5'}`}
+            >
+              <Sparkles className="w-4 h-4" />
+              Buscador Google IA
             </button>
           </div>
         </div>
@@ -594,21 +627,26 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="w-full max-w-2xl mx-auto my-auto"
             >
-              <div className="text-center mb-8">
-                <h2 className="text-4xl font-bold tracking-tight mb-3 text-white drop-shadow-md">Extrae voces e instrumentos</h2>
-                <p className="text-gray-400 text-lg">Sube cualquier canción y nuestra IA separará las pistas en Voces, Batería, Bajo y Otros instrumentos en segundos.</p>
+              <div className="text-center mb-10">
+                <h2 className="text-4xl lg:text-5xl font-black tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-200 drop-shadow-md">
+                  Separador Cuántico de Pistas
+                </h2>
+                <p className="text-emerald-500/80 text-lg max-w-lg mx-auto font-medium">
+                  Sube cualquier canción y nuestro Motor Neural filtrará los espectros acústicos en Voces, Batería, Bajo y Otros con precisión cristalina.
+                </p>
               </div>
 
               <div 
-                className="border-2 border-dashed border-white/10 rounded-3xl p-12 bg-[#121217]/50 backdrop-blur-sm flex flex-col items-center justify-center text-center hover:bg-[#1a1a24]/50 hover:border-indigo-500/50 transition-all cursor-pointer group shadow-2xl"
+                className="border-2 border-dashed border-emerald-500/20 rounded-3xl p-12 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center text-center hover:bg-black/60 hover:border-emerald-500/50 transition-all cursor-pointer group shadow-2xl relative overflow-hidden"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="w-20 h-20 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all shadow-[0_0_20px_rgba(16,185,129,0.15)] relative z-10">
                   <Upload className="w-10 h-10" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2 text-white">Selecciona o arrastra tu audio</h3>
                 <p className="text-sm text-gray-500 mb-8">Soporta MP3, WAV, FLAC, M4A (Max 15MB)</p>
-                <button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-3 rounded-full font-medium hover:from-indigo-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/20">
+                <button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-3 rounded-full font-bold hover:from-emerald-400 hover:to-teal-500 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 relative z-10">
                   <FileAudio className="w-5 h-5" />
                   Elegir Archivo
                 </button>
@@ -772,14 +810,22 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="w-full max-w-2xl"
             >
-              <div className="text-center mb-8">
-                <h2 className="text-4xl font-bold tracking-tight mb-3 text-white drop-shadow-md">Clonador de Voz IA</h2>
-                <p className="text-gray-400 text-lg">Graba o sube tu voz y la IA la convertirá para que suene exactamente como tu artista favorito.</p>
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center justify-center p-2 bg-purple-500/10 text-purple-400 rounded-full mb-3 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+                   <Settings className="w-6 h-6 animate-spin" />
+                </div>
+                <h2 className="text-4xl font-bold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-300">
+                  Clonador Universal J4S
+                </h2>
+                <p className="text-gray-400 text-lg">
+                  Integrado con la potencia de 10 clusters neurales (Arquitectura estilo NASA). Sube tu voz y transfórmala acústicamente en cualquier artista legendario.
+                </p>
               </div>
 
               <div 
-                className="border-2 border-dashed border-white/10 rounded-3xl p-12 bg-[#121217]/50 backdrop-blur-sm flex flex-col items-center justify-center text-center hover:bg-[#1a1a24]/50 hover:border-purple-500/50 transition-all shadow-2xl"
+                className="border-2 border-dashed border-purple-500/20 rounded-3xl p-12 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center text-center hover:bg-black/60 hover:border-purple-500/50 transition-all shadow-2xl relative overflow-hidden group"
               >
+                <div className="absolute inset-0 bg-gradient-to-t from-purple-900/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="w-20 h-20 bg-purple-500/10 text-purple-400 rounded-full flex items-center justify-center mb-6 transition-all hover:scale-110 hover:bg-purple-500/20 cursor-pointer shadow-[0_0_15px_rgba(168,85,247,0.1)]">
                   <Mic className="w-10 h-10" />
                 </div>
@@ -1290,11 +1336,82 @@ export default function App() {
             </motion.div>
           )}
 
+          {activeTab === 'search' && (
+            <motion.div
+              key="search"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-4xl mx-auto"
+            >
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center justify-center p-3 bg-yellow-500/10 text-yellow-400 rounded-full mb-4 shadow-[0_0_20px_rgba(234,179,8,0.2)]">
+                  <Sparkles className="w-8 h-8" />
+                </div>
+                <h2 className="text-4xl lg:text-5xl font-black tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-200">
+                  Buscador Neuronal
+                </h2>
+                <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                  El poder de Google en tus manos. Busca plantillas, instrumentales, voces A Cappella y recursos filtrados por la super IA de J4S Records.
+                </p>
+              </div>
+
+              <div className="bg-[#121217]/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white/10 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600"></div>
+                <form onSubmit={handleSearch} className="relative flex items-center mb-8">
+                  <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Ej. 'Samples de Reggaeton vintage' o 'Vocales Acappella de Pop'..."
+                    className="w-full bg-black/50 border-2 border-white/10 rounded-2xl py-4 px-6 text-lg text-white font-medium focus:outline-none focus:border-yellow-500/50 shadow-inner placeholder:text-gray-600 transition-colors"
+                  />
+                  <button 
+                    type="submit" 
+                    className="absolute right-2 top-2 bottom-2 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black px-6 rounded-xl font-bold transition-all shadow-lg flex items-center gap-2"
+                  >
+                    {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5"/>}
+                    Buscar
+                  </button>
+                </form>
+
+                {searchResults && !isSearching && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                       <LayoutGrid className="w-5 h-5 text-yellow-500" /> Resultados de IA
+                    </h3>
+                    {searchResults.map((res, i) => (
+                      <div key={i} className="group bg-white/5 border border-white/5 p-5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer">
+                        <h4 className="text-lg font-bold text-yellow-100 mb-2 group-hover:text-yellow-400 transition-colors">
+                          {res.title}
+                        </h4>
+                        <p className="text-sm text-gray-400 leading-relaxed text-justify">
+                          {res.desc}
+                        </p>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+                
+                {!searchResults && !isSearching && (
+                    <div className="py-12 flex flex-col items-center justify-center text-gray-600">
+                        <Archive className="w-16 h-16 mb-4 opacity-20" />
+                        <p className="font-medium">Esperando tu consulta en el motor cuantico...</p>
+                    </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </main>
 
-      <footer className="py-6 text-center text-xs text-gray-500 border-t border-white/5 bg-[#09090b] mt-auto relative z-10 backdrop-blur-md">
-        &copy; {new Date().getFullYear()} AudioStudio AI. Licencia MIT. Construido para demostrar el uso de IA en producción musical.
+      <footer className="py-6 text-center text-xs text-gray-500 border-t border-white/5 bg-[#050508]/80 mt-auto relative z-10 backdrop-blur-md">
+        &copy; {new Date().getFullYear()} J4S Music Records. Algoritmos inspirados por arquitecturas de redes neuronales y Google AI. Todos los derechos reservados.
       </footer>
     </div>
   );
